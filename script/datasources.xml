@@ -7,7 +7,7 @@
         <statement-cache-size>1000</statement-cache-size>
         <properties>
             <driver>com.mysql.jdbc.Driver</driver>
-            <url><![CDATA[jdbc:mysql://172.16.157.224:3306/ucenter]]></url>  <!-- 请替换为真实数据库URL及Port  -->
+            <url><![CDATA[jdbc:mysql://172.16.173.11:3306/ucenter]]></url>  <!-- 请替换为真实数据库URL及Port  -->
             <user>uc</user>  <!-- 请替换为真实数据库用户名  -->
             <password>uc_sit</password>  <!-- 请替换为真实数据库密码  -->
             <connectionProperties><![CDATA[useUnicode=true&characterEncoding=UTF-8&autoReconnect=true&socketTimeout=120000]]></connectionProperties>
