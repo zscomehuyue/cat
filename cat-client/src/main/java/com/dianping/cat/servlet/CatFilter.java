@@ -55,13 +55,12 @@ public class CatFilter implements Filter {
 
 	@Override
 	public void destroy() {
+
 	}
 
 	@Override
-	public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
-							throws IOException,	ServletException {
+	public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)throws IOException,	ServletException {
 		Context ctx = new Context((HttpServletRequest) request, (HttpServletResponse) response, chain, m_handlers);
-
 		ctx.handle();
 	}
 
@@ -72,7 +71,6 @@ public class CatFilter implements Filter {
 	@Override
 	public void init(FilterConfig filterConfig) throws ServletException {
 		String pattern = filterConfig.getInitParameter("pattern");
-
 		if (pattern != null) {
 			try {
 				String[] patterns = pattern.split(";");
@@ -86,14 +84,13 @@ public class CatFilter implements Filter {
 				e.printStackTrace();
 			}
 		}
-
 		m_handlers.add(CatHandler.ENVIRONMENT);
 		m_handlers.add(CatHandler.ID_SETUP);
 		m_handlers.add(CatHandler.LOG_SPAN);
 		m_handlers.add(CatHandler.LOG_CLIENT_PAYLOAD);
 	}
 
-	private static enum CatHandler implements Handler {
+	private enum CatHandler implements Handler {
 		ENVIRONMENT {
 			protected int detectMode(HttpServletRequest req) {
 				String source = req.getHeader("X-CAT-SOURCE");
@@ -112,9 +109,7 @@ public class CatFilter implements Filter {
 			public void handle(Context ctx) throws IOException, ServletException {
 				HttpServletRequest req = ctx.getRequest();
 				boolean top = !Cat.getManager().hasContext();
-
 				ctx.setTop(top);
-
 				if (top) {
 					ctx.setMode(detectMode(req));
 					ctx.setType(CatConstants.TYPE_URL);
@@ -123,7 +118,6 @@ public class CatFilter implements Filter {
 				} else {
 					ctx.setType(CatConstants.TYPE_URL_FORWARD);
 				}
-
 				ctx.handle();
 			}
 
@@ -150,11 +144,9 @@ public class CatFilter implements Filter {
 						public String asString(Server server) {
 							String ip = server.getIp();
 							Integer httpPort = server.getHttpPort();
-
 							if ("127.0.0.1".equals(ip)) {
 								ip = NetworkInterfaceManager.INSTANCE.getLocalHostAddress();
 							}
-
 							return ip + ":" + httpPort;
 						}
 					});

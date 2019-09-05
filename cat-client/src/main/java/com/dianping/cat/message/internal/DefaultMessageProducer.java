@@ -115,7 +115,6 @@ public class DefaultMessageProducer implements MessageProducer {
 	@Override
 	public void logHeartbeat(String type, String name, String status, String nameValuePairs) {
 		Heartbeat heartbeat = newHeartbeat(type, name);
-
 		heartbeat.addData(nameValuePairs);
 		heartbeat.setStatus(status);
 		heartbeat.complete();
@@ -125,11 +124,9 @@ public class DefaultMessageProducer implements MessageProducer {
 	public void logMetric(String name, String status, String nameValuePairs) {
 		String type = "";
 		Metric metric = newMetric(type, name);
-
 		if (nameValuePairs != null && nameValuePairs.length() > 0) {
 			metric.addData(nameValuePairs);
 		}
-
 		metric.setStatus(status);
 		metric.complete();
 	}

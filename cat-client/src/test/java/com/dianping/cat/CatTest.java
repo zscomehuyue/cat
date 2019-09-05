@@ -30,6 +30,21 @@ import java.util.concurrent.TimeUnit;
 public class CatTest {
 
     @Test
+    public void getNextId() {
+        Cat.logRemoteCallClient(new Cat.Context() {
+            @Override
+            public void addProperty(String key, String value) {
+
+            }
+
+            @Override
+            public String getProperty(String key) {
+                return null;
+            }
+        });
+    }
+
+    @Test
     public void trans() {
         Transaction tt = Cat.newTransaction("logTransaction", "logTransaction");
         try {

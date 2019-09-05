@@ -199,14 +199,15 @@ public class TcpSocketSender implements Task, MessageSender, LogEnabled {
 		}
 	}
 
+	/**
+	 * 发送数据
+	 */
 	private void processNormalMessage() {
 		while (true) {
 			ChannelFuture channel = m_channelManager.channel();
-
 			if (channel != null) {
 				try {
 					MessageTree tree = m_queue.poll();
-
 					if (tree != null) {
 						sendInternal(channel, tree);
 						tree.setMessage(null);
@@ -235,6 +236,7 @@ public class TcpSocketSender implements Task, MessageSender, LogEnabled {
 	public void run() {
 		m_active = true;
 
+		//FIXME 这么多死循环啊？
 		while (m_active) {
 			processAtomicMessage();
 			processNormalMessage();

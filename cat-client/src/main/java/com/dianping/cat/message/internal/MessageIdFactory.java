@@ -18,9 +18,7 @@
  */
 package com.dianping.cat.message.internal;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.RandomAccessFile;
+import java.io.*;
 import java.lang.management.ManagementFactory;
 import java.lang.management.RuntimeMXBean;
 import java.nio.MappedByteBuffer;
@@ -41,299 +39,372 @@ import com.dianping.cat.util.CleanupHelper;
 
 @Named
 public class MessageIdFactory {
-	public static final long HOUR = 3600 * 1000L;
+    public static final long HOUR = 3600 * 1000L;
 
-	private volatile long m_timestamp = getTimestamp();
+    private volatile long m_timestamp = getTimestamp();
 
-	private volatile AtomicInteger m_index = new AtomicInteger(0);
+    private volatile AtomicInteger m_index = new AtomicInteger(0);
 
-	private String m_domain = "UNKNOWN";
+    private String m_domain = "UNKNOWN";
 
-	private String m_ipAddress;
+    private String m_ipAddress;
 
-	private MappedByteBuffer m_byteBuffer;
+    private MappedByteBuffer m_byteBuffer;
 
-	private RandomAccessFile m_markFile;
+    private RandomAccessFile m_markFile;
 
-	private Map<String, AtomicInteger> m_map = new ConcurrentHashMap<String, AtomicInteger>(100);
+    private Map<String, AtomicInteger> m_map = new ConcurrentHashMap<String, AtomicInteger>(100);
 
-	private int m_retry;
+    private int m_retry;
 
-	private String m_idPrefix;
+    private String m_idPrefix;
 
-	private String m_idPrefixOfMultiMode;
-	
-	public void close() {
-		try {
-			saveMark();
-			if( m_byteBuffer != null ) {
-				synchronized (m_byteBuffer) {
-					CleanupHelper.cleanup(m_byteBuffer);
-					m_byteBuffer = null;
-				}
-			}
-			if( m_markChannel != null ) {
-				m_markChannel.close();
-				m_markChannel = null;
-			}
-			if( m_markFile != null ) {
-				m_markFile.close();
-				m_markFile = null;
-			}
-		} catch (Exception e) {
-			e.printStackTrace();
-			// ignore it
-		}
-	}
-	
+    private String m_idPrefixOfMultiMode;
 
-	private File createMarkFile(String domain) {
-		File mark = new File(Cat.getCatHome(), "cat-" + domain + ".mark");
+    public void close() {
+        try {
+            saveMark();
+            if (m_byteBuffer != null) {
+                synchronized (m_byteBuffer) {
+                    CleanupHelper.cleanup(m_byteBuffer);
+                    m_byteBuffer = null;
+                }
+            }
+            if (m_markChannel != null) {
+                m_markChannel.close();
+                m_markChannel = null;
+            }
+            if (m_markFile != null) {
+                m_markFile.close();
+                m_markFile = null;
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            // ignore it
+        }
+    }
 
-		if (!mark.exists()) {
-			boolean success = true;
-			try {
-				success = mark.createNewFile();
-			} catch (Exception e) {
-				e.printStackTrace();
-				success = false;
-			}
-			if (!success) {
-				mark = createTempFile(domain);
-			}
-		} else if (!mark.canWrite()) {
-			mark = createTempFile(domain);
-		}
-		return mark;
-	}
 
-	private File createTempFile(String domain) {
-		String tmpDir = System.getProperty("java.io.tmpdir");
-		File mark = new File(tmpDir, "cat-" + domain + ".mark");
+    private File createMarkFile(String domain) {
+        File mark = new File(Cat.getCatHome(), "cat-" + domain + ".mark");
 
-		return mark;
-	}
+        if (!mark.exists()) {
+            boolean success = true;
+            try {
+                success = mark.createNewFile();
+            } catch (Exception e) {
+                e.printStackTrace();
+                success = false;
+            }
+            if (!success) {
+                mark = createTempFile(domain);
+            }
+        } else if (!mark.canWrite()) {
+            mark = createTempFile(domain);
+        }
+        return mark;
+    }
 
-	public String getNextId() {
-		long timestamp = getTimestamp();
+    private File createTempFile(String domain) {
+        String tmpDir = System.getProperty("java.io.tmpdir");
+        File mark = new File(tmpDir, "cat-" + domain + ".mark");
 
-		if (timestamp != m_timestamp) {
-			synchronized (this) {
-				if (timestamp != m_timestamp) {
-					resetCounter(timestamp);
-				}
-			}
-		}
+        return mark;
+    }
 
-		int index = m_index.getAndIncrement();
-		StringBuilder sb = new StringBuilder(64);
+    public String getNextId() {
+        long timestamp = getTimestamp();
 
-		if (Cat.isMultiInstanceEnable()) {
-			sb.append(m_idPrefixOfMultiMode).append(index);
-		} else {
-			sb.append(m_idPrefix).append(index);
-		}
+        if (timestamp != m_timestamp) {
+            synchronized (this) {
+                if (timestamp != m_timestamp) {
+                    resetCounter(timestamp);
+                }
+            }
+        }
 
-		return sb.toString();
-	}
+        int index = m_index.getAndIncrement();
+        StringBuilder sb = new StringBuilder(64);
 
-	public String getNextId(String domain) {
-		if (domain.equals(m_domain)) {
-			return getNextId();
-		} else {
-			long timestamp = getTimestamp();
+        if (Cat.isMultiInstanceEnable()) {
+            sb.append(m_idPrefixOfMultiMode).append(index);
+        } else {
+            sb.append(m_idPrefix).append(index);
+        }
+        System.out.println("=nextId=" + sb.toString());
+        return sb.toString();
+    }
 
-			if (timestamp != m_timestamp) {
-				synchronized (this) {
-					if (timestamp != m_timestamp) {
-						resetCounter(timestamp);
-					}
-				}
-			}
+    public String getNextId(String domain) {
+        if (domain.equals(m_domain)) {
+            return getNextId();
+        } else {
+            long timestamp = getTimestamp();
 
-			AtomicInteger value = m_map.get(domain);
+            if (timestamp != m_timestamp) {
+                synchronized (this) {
+                    if (timestamp != m_timestamp) {
+                        resetCounter(timestamp);
+                    }
+                }
+            }
 
-			if (value == null) {
-				synchronized (m_map) {
-					value = m_map.get(domain);
+            AtomicInteger value = m_map.get(domain);
 
-					if (value == null) {
-						value = new AtomicInteger(0);
-						m_map.put(domain, value);
-					}
-				}
-			}
-			int index = value.getAndIncrement();
-			StringBuilder sb = new StringBuilder(m_domain.length() + 32);
+            if (value == null) {
+                synchronized (m_map) {
+                    value = m_map.get(domain);
 
-			sb.append(domain).append('-').append(m_ipAddress).append('-').append(timestamp).append('-').append(index);
+                    if (value == null) {
+                        value = new AtomicInteger(0);
+                        m_map.put(domain, value);
+                    }
+                }
+            }
+            int index = value.getAndIncrement();
+            StringBuilder sb = new StringBuilder(m_domain.length() + 32);
 
-			return sb.toString();
-		}
-	}
+            sb.append(domain).append('-').append(m_ipAddress).append('-').append(timestamp).append('-').append(index);
 
-	private int getProcessID() {
-		try {
-			RuntimeMXBean runtimeMXBean = ManagementFactory.getRuntimeMXBean();
-			return Integer.valueOf(runtimeMXBean.getName().split("@")[0]).intValue();
-		} catch (Exception e) {
-			Cat.logError(e);
-		}
-		return -1;
-	}
+            System.out.println("=getNextId=>domain=" + domain + ",nextId=" + sb.toString());
+            return sb.toString();
+        }
+    }
 
-	protected long getTimestamp() {
-		long timestamp = System.currentTimeMillis();
+    private int getProcessID() {
+        try {
+            RuntimeMXBean runtimeMXBean = ManagementFactory.getRuntimeMXBean();
+            return Integer.valueOf(runtimeMXBean.getName().split("@")[0]).intValue();
+        } catch (Exception e) {
+            Cat.logError(e);
+        }
+        return -1;
+    }
 
-		return timestamp / HOUR; // version 2
-	}
-	
-	String genIpHex() {
-		String ip =  NetworkInterfaceManager.INSTANCE.getLocalHostAddress();
-		List<String> items = Splitters.by(".").noEmptyItem().split(ip);
-		byte[] bytes = new byte[4];
+    protected long getTimestamp() {
+        long timestamp = System.currentTimeMillis();
 
-		for (int i = 0; i < 4; i++) {
-			bytes[i] = (byte) Integer.parseInt(items.get(i));
-		}
+        return timestamp / HOUR; // version 2
+    }
 
-		StringBuilder sb = new StringBuilder(bytes.length / 2);
+    String genIpHex() {
+        String ip = NetworkInterfaceManager.INSTANCE.getLocalHostAddress();
+        List<String> items = Splitters.by(".").noEmptyItem().split(ip);
+        byte[] bytes = new byte[4];
 
-		for (byte b : bytes) {
-			sb.append(Integer.toHexString((b >> 4) & 0x0F));
-			sb.append(Integer.toHexString(b & 0x0F));
-		}
-		return sb.toString();
-	}
-	
-	private transient FileChannel m_markChannel;
+        for (int i = 0; i < 4; i++) {
+            bytes[i] = (byte) Integer.parseInt(items.get(i));
+        }
 
-	public void initialize(String domain) throws IOException {
-		m_domain = domain;
-		m_ipAddress = genIpHex();
-		if( m_markFile != null ) {
-			synchronized (this) {
-				close();
-			}
-		}
-		File mark = createMarkFile(domain);
-		m_markFile = new RandomAccessFile(mark, "rw");
-		m_markChannel = m_markFile.getChannel();
-		m_byteBuffer = m_markChannel.map(MapMode.READ_WRITE, 0, 1024 * 1024L);
-		m_idPrefix = initIdPrefix(getTimestamp(), false);
-		m_idPrefixOfMultiMode = initIdPrefix(getTimestamp(), true);
+        StringBuilder sb = new StringBuilder(bytes.length / 2);
 
-		if (m_byteBuffer.limit() > 0) {
-			try {
-				long lastTimestamp = m_byteBuffer.getLong();
-				int index = m_byteBuffer.getInt();
+        for (byte b : bytes) {
+            sb.append(Integer.toHexString((b >> 4) & 0x0F));
+            sb.append(Integer.toHexString(b & 0x0F));
+        }
+        return sb.toString();
+    }
 
-				if (lastTimestamp == m_timestamp) { // for same hour
-					m_index = new AtomicInteger(index + 1000);
+    private transient FileChannel m_markChannel;
 
-					int mapLength = m_byteBuffer.getInt();
+    public void initialize(String domain) throws IOException {
+        m_domain = domain;
+        m_ipAddress = genIpHex();
+        if (m_markFile != null) {
+            synchronized (this) {
+                close();
+            }
+        }
+        File mark = createMarkFile(domain);
+        m_markFile = new RandomAccessFile(mark, "rw");
+        m_markChannel = m_markFile.getChannel();
+        m_byteBuffer = m_markChannel.map(MapMode.READ_WRITE, 0, 1024 * 1024L);
+        m_idPrefix = initIdPrefix(getTimestamp(), false);
+        m_idPrefixOfMultiMode = initIdPrefix(getTimestamp(), true);
 
-					for (int i = 0; i < mapLength; i++) {
-						int domainLength = m_byteBuffer.getInt();
-						byte[] domainArray = new byte[domainLength];
+        if (m_byteBuffer.limit() > 0) {
+            try {
+                long lastTimestamp = m_byteBuffer.getLong();
+                int index = m_byteBuffer.getInt();
 
-						m_byteBuffer.get(domainArray);
-						int value = m_byteBuffer.getInt();
+                if (lastTimestamp == m_timestamp) { // for same hour
+                    m_index = new AtomicInteger(index + 1000);
 
-						m_map.put(new String(domainArray), new AtomicInteger(value + 1000));
-					}
-				} else {
-					m_index = new AtomicInteger(0);
-				}
-			} catch (Exception e) {
-				e.printStackTrace();
-				m_retry++;
+                    int mapLength = m_byteBuffer.getInt();
 
-				if (m_retry == 1) {
-					mark.delete();
-					initialize(domain);
-				}
-			}
-		}
+                    for (int i = 0; i < mapLength; i++) {
+                        int domainLength = m_byteBuffer.getInt();
+                        byte[] domainArray = new byte[domainLength];
 
-		saveMark();
-		if( !shutdownHookOn ) {
-			synchronized (this) {
-				if( !shutdownHookOn ) {
-					Runtime.getRuntime().addShutdownHook(new Thread() {
-						@Override
-						public void run() {
-							close();
-						}
-					});
-				}
-			}
-			shutdownHookOn = true;
-		}
-	}
-	private volatile boolean shutdownHookOn;
+                        m_byteBuffer.get(domainArray);
+                        int value = m_byteBuffer.getInt();
 
-	private String initIdPrefix(long timestamp, boolean multiMode) {
-		StringBuilder sb = new StringBuilder(m_domain.length() + 32);
-		int processID = getProcessID();
+                        m_map.put(new String(domainArray), new AtomicInteger(value + 1000));
+                    }
+                } else {
+                    m_index = new AtomicInteger(0);
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+                m_retry++;
 
-		if (multiMode && processID > 0) {
-			sb.append(m_domain).append('-').append(m_ipAddress).append(".").append(processID).append('-').append(timestamp)
-									.append('-');
-		} else {
-			sb.append(m_domain).append('-').append(m_ipAddress).append('-').append(timestamp).append('-');
-		}
+                if (m_retry == 1) {
+                    mark.delete();
+                    initialize(domain);
+                }
+            }
+        }
 
-		return sb.toString();
-	}
+        saveMark();
+        if (!shutdownHookOn) {
+            synchronized (this) {
+                if (!shutdownHookOn) {
+                    Runtime.getRuntime().addShutdownHook(new Thread() {
+                        @Override
+                        public void run() {
+                            close();
+                        }
+                    });
+                }
+            }
+            shutdownHookOn = true;
+        }
+    }
 
-	private void resetCounter(long timestamp) {
-		m_index.set(0);
+    private volatile boolean shutdownHookOn;
 
-		for (Entry<String, AtomicInteger> entry : m_map.entrySet()) {
-			entry.getValue().set(0);
-		}
+    private String initIdPrefix(long timestamp, boolean multiMode) {
+        StringBuilder sb = new StringBuilder(m_domain.length() + 32);
+        int processID = getProcessID();
 
-		m_idPrefix = initIdPrefix(timestamp, false);
-		m_idPrefixOfMultiMode = initIdPrefix(timestamp, true);
+        if (multiMode && processID > 0) {
+            sb.append(m_domain).append('-').append(m_ipAddress).append(".").append(processID).append('-').append(timestamp)
+                    .append('-');
+        } else {
+            sb.append(m_domain).append('-').append(m_ipAddress).append('-').append(timestamp).append('-');
+        }
 
-		m_timestamp = timestamp;
-	}
-	public int getIndex() {
-		return m_index.get();
-	}
+        return sb.toString();
+    }
 
-	public synchronized void saveMark() {
-		if( m_byteBuffer == null ) {
-			return;
-		}
-		try {
-			m_byteBuffer.rewind();
-			m_byteBuffer.putLong(m_timestamp);
-			m_byteBuffer.putInt(m_index.get());
-			m_byteBuffer.putInt(m_map.size());
+    private void resetCounter(long timestamp) {
+        m_index.set(0);
 
-			for (Entry<String, AtomicInteger> entry : m_map.entrySet()) {
-				byte[] bytes = entry.getKey().toString().getBytes();
+        for (Entry<String, AtomicInteger> entry : m_map.entrySet()) {
+            entry.getValue().set(0);
+        }
 
-				m_byteBuffer.putInt(bytes.length);
-				m_byteBuffer.put(bytes);
-				m_byteBuffer.putInt(entry.getValue().get());
-			}
+        m_idPrefix = initIdPrefix(timestamp, false);
+        m_idPrefixOfMultiMode = initIdPrefix(timestamp, true);
 
-			m_byteBuffer.force();
-		} catch (Throwable e) {
-			e.printStackTrace();
-			// ignore it
-		}
-	}
+        m_timestamp = timestamp;
+    }
 
-	public void setDomain(String domain) {
-		m_domain = domain;
-	}
+    public int getIndex() {
+        return m_index.get();
+    }
 
-	public void setIpAddress(String ipAddress) {
-		m_ipAddress = ipAddress;
-	}
+    public synchronized void saveMark() {
+        long start = System.currentTimeMillis();
+        if (m_byteBuffer == null) {
+            return;
+        }
+        try {
+            m_byteBuffer.rewind();
+            m_byteBuffer.putLong(m_timestamp);
+            m_byteBuffer.putInt(m_index.get());
+            m_byteBuffer.putInt(m_map.size());
+
+            for (Entry<String, AtomicInteger> entry : m_map.entrySet()) {
+                byte[] bytes = entry.getKey().toString().getBytes();
+
+                m_byteBuffer.putInt(bytes.length);
+                m_byteBuffer.put(bytes);
+                m_byteBuffer.putInt(entry.getValue().get());
+            }
+
+            m_byteBuffer.force();
+//            System.out.println("=saveMark=>" + (System.currentTimeMillis() - start) + " millseconds");
+        } catch (Throwable e) {
+            e.printStackTrace();
+            // ignore it
+        }
+    }
+
+    public void setDomain(String domain) {
+        m_domain = domain;
+    }
+
+    public void setIpAddress(String ipAddress) {
+        m_ipAddress = ipAddress;
+    }
+
+    public static void main(String args[]) {
+        read();
+    }
+
+    private static void writeAndRead() {
+        try {
+            String path = "/data/appdatas/cat/cat-udip-manager.mark";
+            RandomAccessFile rw = new RandomAccessFile(new File(path), "rw");
+            FileChannel channel = rw.getChannel();
+            MappedByteBuffer buffer = channel.map(MapMode.READ_WRITE, 0, 1024);
+
+            buffer.putLong(System.currentTimeMillis());
+            buffer.putInt(1);
+            buffer.putInt(0);
+
+            buffer.flip();
+            StringBuilder sb = new StringBuilder();
+            while (buffer.hasRemaining()) {
+                sb.append("time=").append(buffer.getLong()).append(",");
+                sb.append("int1=").append(buffer.getInt()).append(",");
+                sb.append("int2=").append(buffer.getInt()).append(",");
+            }
+            System.out.println(sb.toString());
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static void write() {
+        try {
+            String path = "/data/appdatas/cat/cat-udip-manager.mark";
+            RandomAccessFile rw = new RandomAccessFile(new File(path), "rw");
+            FileChannel channel = rw.getChannel();
+            MappedByteBuffer buffer = channel.map(MapMode.READ_WRITE, 0, 1024);
+            buffer.putLong(System.currentTimeMillis());
+            buffer.putInt(1);
+            buffer.putInt(0);
+            buffer.force();
+            channel.close();
+            rw.close();
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static void read() {
+        try {
+            String path = "/data/appdatas/cat/cat-udip-manager.mark";
+            RandomAccessFile rw = new RandomAccessFile(new File(path), "rw");
+            MappedByteBuffer buffer = rw.getChannel().map(MapMode.READ_ONLY, 0, rw.length());
+            while (buffer.hasRemaining()) {
+                StringBuilder sb = new StringBuilder();
+                sb.append("time=").append((Long) buffer.getLong()).append(",");
+                sb.append("index=").append(buffer.getInt()).append(",");
+                sb.append("mapSize=").append(buffer.getInt()).append(",");
+                System.out.println(sb.toString());
+            }
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 
 }

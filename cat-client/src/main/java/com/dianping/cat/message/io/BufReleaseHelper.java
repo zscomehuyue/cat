@@ -25,14 +25,14 @@ import com.dianping.cat.Cat;
 
 public class BufReleaseHelper {
 
-	public static void release(ByteBuf buf) {
-		try {
-			if (buf != null) {
-				ReferenceCountUtil.release(buf);
-			}
-		} catch (Exception e) {
-			Cat.logError(e);
-		}
-	}
+    public static void release(ByteBuf buf) {
+        try {
+            if (buf != null) {
+                ReferenceCountUtil.release(buf);
+            }
+        } catch (Exception e) {
+            Cat.logError(e);
+        }
+    }
 
 }
