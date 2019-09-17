@@ -1,41 +1,39 @@
 <?xml version="1.0" encoding="utf-8"?>
+<server-config>
+    <server id="default">
+        <properties>
+            <property name="local-mode" value="true"/> <!--存储本地文件-->
+            <property name="job-machine" value="true"/> <!--生成报告文件-->
+            <property name="send-machine" value="true"/><!--发送告警消息-->
+            <property name="alarm-machine" value="true"/><!--开启告警功能-->
+            <property name="hdfs-enabled" value="false"/>
+            <property name="remote-servers" value="127.0.0.1:8080"/>
+        </properties>
+        <storage local-base-dir="/data/appdatas/cat/bucket/" max-hdfs-storage-time="15" local-report-storage-time="2" local-logivew-storage-time="1" har-mode="true" upload-thread="5">
+            <hdfs id="dump" max-size="128M" server-uri="hdfs://127.0.0.1/" base-dir="/user/cat/dump"/>
+            <harfs id="dump" max-size="128M" server-uri="har://127.0.0.1/" base-dir="/user/cat/dump"/>
+            <properties>
+                <property name="hadoop.security.authentication" value="false"/>
+                <property name="dfs.namenode.kerberos.principal" value="hadoop/dev80.hadoop@testserver.com"/>
+                <property name="dfs.cat.kerberos.principal" value="cat@testserver.com"/>
+                <property name="dfs.cat.keytab.file" value="/data/appdatas/cat/cat.keytab"/>
+                <property name="java.security.krb5.realm" value="value1"/>
+                <property name="java.security.krb5.kdc" value="value2"/>
+            </properties>
+        </storage>
+        <consumer>
+            <long-config default-url-threshold="1000" default-sql-threshold="100" default-service-threshold="50">
+                <domain name="cat" url-threshold="500" sql-threshold="500"/>
+                <domain name="OpenPlatformWeb" url-threshold="100" sql-threshold="500"/>
+            </long-config>
+        </consumer>
+    </server>
+    <server id="172.16.160.50">
+        <properties>
+            <property name="job-machine" value="true"/>
+            <property name="send-machine" value="true"/>
+            <property name="alarm-machine" value="true"/>
+        </properties>
+    </server>
+</server-config>
 
-<!-- Configuration for development environment-->
-<config local-mode="true" hdfs-machine="false" job-machine="false" alert-machine="false">
-
-    <storage local-base-dir="/data/appdatas/cat/bucket/" max-hdfs-storage-time="15" local-report-storage-time="7"
-             local-logivew-storage-time="7">
-
-    </storage>
-    <console default-domain="Cat" show-cat-domain="true">
-        <remote-servers>127.0.0.1:2281</remote-servers>
-    </console>
-    <ldap ldapUrl="ldap://192.168.50.11:389/DC=dianpingoa,DC=com"/>
-</config>
-
-        <!-- Configuration for production environment -->
-        <!-- Note: -->
-        <!-- 1. Set local-mode false to activate remote mode. -->
-        <!-- 2. If machine is job-machine, set job-machine true, you just need config only one machine. Job is offline for report aggreation, statistics report.-->
-        <!-- 3. If machine is alert-machine, set alert-machine true, you just need config only one machine. -->
-        <!-- 4. Cat can run without hdfs, you just config hdfs-machine false. If you have hdfs, you can config hdfs info for saving the logview info.  -->
-        <!-- 5. If you don't need hdfs, the logview will be stored in local disk. You can config max local-logivew-storage-time for cleaning up old logview, the unit is day. -->
-        <!-- 6. Please set hadoop environment accordingly. -->
-        <!-- 7. Please set ldap info for login the system. -->
-        <!-- 8. Please config remote-server if you have many cat servers. -->
-        <!--
-        <config local-mode="false" hdfs-machine="false" job-machine="false" alert-machine="false">
-            <storage  local-base-dir="/data/appdatas/cat/bucket/" max-hdfs-storage-time="15" local-report-storage-time="7" local-logivew-storage-time="7">
-                <hdfs id="logview" max-size="128M" server-uri="hdfs://10.1.77.86/user/cat" base-dir="logview"/>
-                <hdfs id="dump" max-size="128M" server-uri="hdfs://10.1.77.86/user/cat" base-dir="dump"/>
-                <hdfs id="remote" max-size="128M" server-uri="hdfs://10.1.77.86/user/cat" base-dir="remote"/>
-            </storage>
-
-            <console default-domain="Cat" show-cat-domain="true">
-                <remote-servers>192.168.0.1:2281,192.168.0.2:2281</remote-servers>
-            </console>
-
-            <ldap ldapUrl="ldap://192.168.50.11:389/DC=dianpingoa,DC=com"/>
-        </config>
-
-        -->

@@ -131,7 +131,7 @@ public class MessageIdFactory {
         } else {
             sb.append(m_idPrefix).append(index);
         }
-        System.out.println("=nextId=" + sb.toString());
+//        System.out.println("=nextId=" + sb.toString());
         return sb.toString();
     }
 
